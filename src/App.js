@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
+// My codesandbox server run it first
+const baseUrl = "https://wfn5s.sse.codesandbox.io";
+
 const useField = (type) => {
   const [value, setValue] = useState("");
 
@@ -8,78 +11,85 @@ const useField = (type) => {
     setValue(event.target.value);
   };
 
+  const reset = () => {
+    setValue("");
+  };
+
   return {
-    type,
-    value,
-    onChange
+    inputProps: {
+      type,
+      value,
+      onChange
+    },
+    reset
   };
 };
 
-const useCountry = (name) => {
-  const [country, setCountry] = useState(null);
+const useResource = (url) => {
+  const [resources, setResources] = useState([]);
 
   useEffect(() => {
-    axios
-      .get(
-        `https://restcountries.eu/rest/v2/name/${name}?fullText=true
-    `
-      )
-      .then((country) => {
-        setCountry({
-          name: country.data[0].name,
-          capital: country.data[0].capital,
-          population: country.data[0].population,
-          flag: country.data[0].flag,
-          found: true
-        });
-      })
-      .catch(() => setCountry({ found: false }));
-  }, [name]);
+    axios.get(url).then(({ data }) => setResources(data));
+  }, [url]);
 
-  return country;
-};
+  const create = async (resource) => {
+    const created = await axios.post(url, resource);
+    setResources([...resources, created.data]);
+  };
 
-const Country = ({ country }) => {
-  if (!country) {
-    return null;
-  }
+  const service = {
+    create
+  };
 
-  if (!country.found) {
-    return <div>not found...</div>;
-  }
-
-  return (
-    <div>
-      <h3>{country.name} </h3>
-      <div>
-        capital <strong>{country.capital}</strong>
-      </div>
-      <div>
-        population <strong>{country.population}</strong>
-      </div>
-      <img src={country.flag} height="100" alt={`flag of ${country.name}`} />
-    </div>
-  );
+  return [resources, service];
 };
 
 const App = () => {
-  const nameInput = useField("text");
-  const [name, setName] = useState("");
-  const country = useCountry(name);
+  const content = useField("text");
+  const name = useField("text");
+  const number = useField("text");
 
-  const fetch = (e) => {
-    e.preventDefault();
-    setName(nameInput.value);
+  const [notes, noteService] = useResource(`${baseUrl}/notes`);
+  const [persons, personService] = useResource(`${baseUrl}/persons`);
+
+  const handleNoteSubmit = (event) => {
+    event.preventDefault();
+    noteService.create({ content: content.inputProps.value });
+    content.reset();
+  };
+
+  const handlePersonSubmit = (event) => {
+    event.preventDefault();
+    personService.create({
+      name: name.inputProps.value,
+      number: number.inputProps.value
+    });
+    name.reset();
+    number.reset();
   };
 
   return (
     <div>
-      <form onSubmit={fetch}>
-        <input {...nameInput} />
-        <button>find</button>
+      <h2>notes</h2>
+      <form onSubmit={handleNoteSubmit}>
+        <input {...content.inputProps} />
+        <button>create</button>
       </form>
+      {notes.map((n) => (
+        <p key={n.id}>{n.content}</p>
+      ))}
 
-      <Country country={country} />
+      <h2>persons</h2>
+      <form onSubmit={handlePersonSubmit}>
+        name <input {...name.inputProps} /> <br />
+        number <input {...number.inputProps} />
+        <button>create</button>
+      </form>
+      {persons.map((n) => (
+        <p key={n.id}>
+          {n.name} {n.number}
+        </p>
+      ))}
     </div>
   );
 };
